@@ -18,6 +18,7 @@
 #include "../dsrg_mrpt2.h"
 
 #include "integrals/one_body_integrals.h"
+#include "integrals/integrals.h"
 
 using namespace ambit;
 using namespace psi;
@@ -36,7 +37,9 @@ SharedMatrix DSRG_MRPT2::compute_gradient() {
         write_df_rdm();
     } else {
         write_2rdm_spin_dependent();
-        tpdm_backtransform();
+        if (ints_->integral_type() != Custom) {
+            tpdm_backtransform();
+        }
     }
     outfile->Printf("\n    Computing Gradient .............................. Done\n");
     return std::make_shared<psi::Matrix>("nullptr", 0, 0);
