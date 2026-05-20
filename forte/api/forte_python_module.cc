@@ -269,7 +269,9 @@ PYBIND11_MODULE(_forte, m) {
         .def("set_ci_vectors", &MASTER_DSRG::set_ci_vectors,
              "Set the CI eigenvector for DSRG-MRPT2 analytic gradients")
         .def("set_active_space_solver", &MASTER_DSRG::set_active_space_solver,
-             "Set the shared pointer for ActiveSpaceSolver");
+             "Set the shared pointer for ActiveSpaceSolver")
+        .def_readonly("lagrangian_", &MASTER_DSRG::lagrangian_)
+        .def_readonly("relaxed_rdm1_", &MASTER_DSRG::relaxed_rdm1_);
 
     // export SADSRG
     py::class_<SADSRG>(m, "SADSRG")
