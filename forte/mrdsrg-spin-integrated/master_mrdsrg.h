@@ -127,6 +127,10 @@ class MASTER_DSRG : public DynamicCorrelationSolver {
     /// If amplitudes are converged
     bool converged() { return converged_; }
 
+    std::shared_ptr<psi::Matrix> lagrangian_;
+
+    std::shared_ptr<psi::Matrix> relaxed_rdm1_;
+
   protected:
     /// Startup function called in constructor
     void startup();
