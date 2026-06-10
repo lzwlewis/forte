@@ -13,42 +13,57 @@ from .helpers import make_mo_spaces_from_options
 
 import pyscf
 
+from functools import partial
+np.einsum = partial(np.einsum, optimize=True)
+
 
 def _make_ints_from_pyscf(pyscf_obj, data: ForteData, mo_coeff):
     """
     Make custom integrals from the PySCF wavefunction object
     """
-    int_ao = pyscf_obj.mol.intor("int2e", aosym="s8")
-    eri = pyscf.ao2mo.incore.full(int_ao, mo_coeff, compact=False).reshape(mo_coeff.shape * 2)
-    nmo = pyscf_obj.mol.nao_nr()
+    # int_ao = pyscf_obj.mol.intor("int2e", aosym="s8")
+    # eri = pyscf.ao2mo.incore.full(int_ao, mo_coeff, compact=False).reshape(mo_coeff.shape * 2)
+    if getattr(pyscf_obj, 'with_df', None) is not None:
+        eri = pyscf.ao2mo.restore(1, pyscf_obj.with_df.ao2mo(mo_coeff), mo_coeff.shape[0])
+    else:
+        if getattr(pyscf_obj, '_scf', None):
+            if getattr(pyscf_obj._scf, '_eri', None) is not None:
+                eri = pyscf.ao2mo.kernel(pyscf_obj._scf._eri, mo_coeff, compact=False).reshape(mo_coeff.shape * 2)
+            else:
+                eri = pyscf.ao2mo.kernel(pyscf_obj._scf.mol, mo_coeff, compact=False).reshape(mo_coeff.shape * 2)
+        else:
+            eri = pyscf.ao2mo.kernel(pyscf_obj.mol, mo_coeff, compact=False).reshape(mo_coeff.shape * 2)
+    # nmo = pyscf_obj.mol.nao_nr()
+    nmo = mo_coeff.shape[0]
 
     eri_aa = np.zeros((nmo, nmo, nmo, nmo))
     eri_ab = np.zeros((nmo, nmo, nmo, nmo))
-    eri_bb = np.zeros((nmo, nmo, nmo, nmo))
+    # eri_bb = np.zeros((nmo, nmo, nmo, nmo))
     # <ij||kl> = (ik|jl) - (il|jk)
     eri_aa += np.einsum("ikjl->ijkl", eri)
     eri_aa -= np.einsum("iljk->ijkl", eri)
     # <ij|kl> = (ik|jl)
     eri_ab = np.einsum("ikjl->ijkl", eri)
     # <ij||kl> = (ik|jl) - (il|jk)
-    eri_bb += np.einsum("ikjl->ijkl", eri)
-    eri_bb -= np.einsum("iljk->ijkl", eri)
+    # eri_bb += np.einsum("ikjl->ijkl", eri)
+    # eri_bb -= np.einsum("iljk->ijkl", eri)
 
     enuc = pyscf_obj.mol.energy_nuc()
     hcore_ao = pyscf_obj.get_hcore()
 
-    hcore = np.einsum("uv,up,vq->pq", hcore_ao, mo_coeff.conj(), mo_coeff, optimize="optimal")
+    hcore = np.einsum("uv,up,vq->pq", hcore_ao, mo_coeff.conj(), mo_coeff)
 
     ints = forte.make_custom_ints(
         data.options,
         data.scf_info,
         data.mo_space_info,
         enuc,
-        hcore.flatten(),
-        hcore.flatten(),
-        eri_aa.flatten(),
-        eri_ab.flatten(),
-        eri_bb.flatten(),
+        hcore.ravel(),
+        hcore.ravel(),
+        eri_aa.ravel(),
+        eri_ab.ravel(),
+        # eri_bb.flatten(),
+        eri_aa.ravel(),
     )
     data.ints = ints
 
@@ -194,8 +209,8 @@ class ObjectsFromPySCF(Module):
         psi4.core.print_out("\n  Forte will use PySCF interfaces to prepare the objects\n")
 
     def _run(self, data: ForteData = None) -> ForteData:
-        if "FIRST" in data.options.get_str("DERTYPE"):
-            raise Exception("Energy gradients NOT available from PySCF yet!")
+        # if "FIRST" in data.options.get("DERTYPE"):
+        #     raise Exception("Energy gradients NOT available from PySCF yet!")
 
         psi4.core.print_out("\n  Preparing forte objects from PySCF\n")
 
